@@ -2,7 +2,7 @@
 import os
 import time
 import copy
-import tqdm
+from tqdm import tqdm
 import logging
 import argparse
 import collections
@@ -61,8 +61,8 @@ def train(args):
                     ])
 
     data = {
-        'train': StyleGAN2_Data(root=args.root, split='train', fname=args.fname, transform=data_transforms, scale_size=args.image_size),
-        'val': StyleGAN2_Data(root=args.root, split='val', fname=args.fname, transform=data_transforms, scale_size=args.image_size)
+        'train': StyleGAN2_Data(root=args.root, split='train', lname=args.lname, transform=data_transforms, scale_size=args.image_size),
+        'val': StyleGAN2_Data(root=args.root, split='val', lname=args.lname, transform=data_transforms, scale_size=args.image_size)
         }
 
     data_loader = {
@@ -119,7 +119,7 @@ def train(args):
 
             running_loss = 0.0
 
-            for batch in tqdm.tqdm(data_loader[phase]):
+            for batch in tqdm(data_loader[phase]):
 
                 inputs = batch['image'].to(device)
                 labels = batch['label'].to(device)
@@ -129,7 +129,7 @@ def train(args):
 
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
-                    # outputs = outputs.to(float)
+                    outputs = outputs.to(float)
                     loss = criterion(outputs, labels)
 
                     if phase == 'train':
@@ -212,35 +212,34 @@ def test(args):
                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                     ])
 
-    data = StyleGAN2_Data(root=args.root, split='test', fname=args.fname, transform=data_transforms, scale_size=args.image_size)
+    data = StyleGAN2_Data(root=args.root, split='test', fname=args.lname, transform=data_transforms, scale_size=args.image_size)
     data_loader = torch.utils.data.DataLoader(data, batch_size=args.batch_size, shuffle=False, num_workers=4, drop_last=False)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
 
     model.eval()
 
-    for i, batch in enumerate(data_loader):
+    running_loss = 0.0
+
+    criterion = nn.MSELoss()
+
+    for batch in tqdm(data_loader):
 
         inputs = batch['image'].to(device)
-        indices = batch['meta']['index']
+        labels = batch['label'].to(device)
         outputs = model(inputs)
-        outputs = outputs.cpu().detach().numpy()
 
-        for (index, output) in zip(indices, outputs):
+        with torch.no_grad():
+            loss = criterion(outputs, labels)
 
-            print(f"Run for {index}/{len(indices)}...")
+        running_loss += loss.item() * inputs.size(0)
 
-            output = output.reshape(1, -1)
-            pred = data.inv_scale_label(output)
-            pred = pred.reshape(-1, 2)
+    epoch_loss = running_loss / len(data_loader.dataset)
 
-            input = data.get_image(index, os.path.join(args.root, 'test'))
-            save_image(input, os.path.join(args.val_save_dir, f'out_{index}.png'), pred)
+    print(f'Loss: {epoch_loss:.4f}')
 
-            if i == 0:
-                answ = data.labels_original[index]
-                answ = answ.reshape(-1, 2)
-                save_image(input, os.path.join(args.val_save_dir, f'out_{index}_ans.png'), answ)
+    # for i in range(5):
+    #     print(f"Sample latents {labels[i].cpu().detach().numpy()}, Sample output: {outputs[i].cpu().detach().numpy()}")
 
 
 
@@ -250,15 +249,15 @@ def main():
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'], help='train/test')
 
     parser.add_argument('--image_size', type=int, default=256, help='training data size == (x.size[0])')
-    parser.add_argument('--out_features', type=int, default=136, help='number of classes == y')
+    parser.add_argument('--out_features', type=int, default=3, help='number of classes == y')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--num_epochs', type=int, default=30, help='number of epochs to run')
-    parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='l2 norm')
+    parser.add_argument('--lr', type=float, default=1e-6, help='learning rate')
+    parser.add_argument('--weight_decay', type=float, default=1e-3, help='l2 norm')
     parser.add_argument('--feature_extract', type=int, choices=[0, 1], default=0, help='finetune fc layer only (True, 1) / all layers (False, 0)')
 
     parser.add_argument('--root', type=str, default='data', help='training data dir')
-    parser.add_argument('--fname', type=str, default='landmarks', help='label file name')
+    parser.add_argument('--lname', type=str, default='pose', help='label file name')
     parser.add_argument('--pretrained_path', type=str, default='./pretrained/senet50_scratch_weight.pkl', help='pretrained SENet model path')
     parser.add_argument('--model_path', type=str, default='./ckpt/senet_ckpt_0.001.pth', help='pretrained SENet model path')
 

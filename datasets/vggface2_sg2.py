@@ -8,7 +8,7 @@ INPUT_SIZE = 224
 
 class StyleGAN2_Data(datasets.ImageFolder):
 
-    def __init__(self, root='data/', split='train', transform=None, scale_size=-1):
+    def __init__(self, root='data/', split='train', lname='landmarks', transform=None, scale_size=-1):
         super(StyleGAN2_Data, self).__init__(root)
 
         assert os.path.exists(root), "root: {} not found.".format(root)
@@ -16,24 +16,24 @@ class StyleGAN2_Data(datasets.ImageFolder):
         self.root = os.path.join(root, split)
         self.split = split
         self.transform = transform
-        self.scaler = MinMaxScaler(feature_range = (-1, 1))
+        self.scaler = MinMaxScaler(feature_range = (0, 1))
         self.scale_size = scale_size
     
         if split == 'train':
-            self.labels_original = np.load(os.path.join(root, 'train', 'npy', 'landmarks.npy'))
+            self.labels_original = np.load(os.path.join(root, 'train', 'npy', f'{lname}.npy'))
             if scale_size > 0:
                 self.labels = self.scale_label(self.labels_original / scale_size * INPUT_SIZE)
             else:
                 self.labels = self.scale_label(self.labels_original)
 
         elif split == 'val' or 'test':
-            self.labels_original = np.load(os.path.join(root, 'train', 'npy', 'landmarks.npy'))
+            self.labels_original = np.load(os.path.join(root, 'train', 'npy', f'{lname}.npy'))
             if scale_size > 0:
                 self.scale_label(self.labels_original / scale_size * INPUT_SIZE)
             else:
                 self.scale_label(self.labels_original)
 
-            self.labels_original = np.load(os.path.join(root, split, 'npy', 'landmarks.npy'))
+            self.labels_original = np.load(os.path.join(root, split, 'npy', f'{lname}.npy'))
             if scale_size > 0:
                 self.labels = self.scale_val_label(self.labels_original / scale_size * INPUT_SIZE)
             else:

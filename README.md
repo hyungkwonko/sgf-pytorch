@@ -4,9 +4,7 @@ This is an unofficial implementation of the paper ["Surrogate Gradient Field for
 
 ![sgf_result](./docs/sgf_result.jpg)
 
-### (Jul. 16, 2021) Current issues in the result (TODO, working on)
-- the ID of face changes
-    - how to fix? Will add more supervision (binary attributes)
+The author leveraged diverse labels (e.g., age, gender, smile, ...) using [MS Face API](https://azure.microsoft.com/en-us/services/cognitive-services/face/). In the experiment, I only used pose values in a soft manner (0.0 ~ 1.0) for my own research. Empirically, the result shows a smooth transition compared to the manipulation learned by hard labels. I believe adding more labels as the authors did in their work will make the transition more robust (e.g., id or characteristics of the input image is sustained while manipulating it).
 
 
 ## Requirements
@@ -35,7 +33,7 @@ pip install numba
 ## Run SGF
 To see the manipulation result:
 ```
-python sgf.py --G_path 'path/to/generator.pkl' --SE_path 'path/to/se.pth' --AUX_path 'path/to/aux.pth' --save_result 1
+python sgf_pose.py --G_path 'path/to/generator.pkl' --SE_path 'path/to/se.pth' --AUX_path 'path/to/aux.pth' --save_result 1
 ```
 
 ---
@@ -52,7 +50,7 @@ python generate.py --outdir=data/test/images --seeds=100500,101000 --resize 256
 ```
 
 ### Step 2: Label images [`c`]
-- Label images using Azure Face API / open source Face landmark detection algorithm
+- Label images using Azure Face API / open source Face landmark detection algorithm to infer pose (yaw, roll, pitch)
 ```
 python face_align.py --indir train
 python face_align.py --indir val
@@ -64,13 +62,25 @@ python face_align.py --indir test
 python face_align.py --indir test --plot 1
 ```
 
+- Next, infer the face pose values (e.g., yaw, roll, pitch)
+```
+python pose_estimation.py --image_dir data/train/
+python pose_estimation.py --image_dir data/val/
+python pose_estimation.py --image_dir data/test/
+```
+
+- If you want to see the pose result
+```
+python pose_estimation.py --image_dir data/test/ --save_img 1
+```
 
 ### Step 3: Fine-tune Squeeze and Excitation Network using images [`x`] and labels [`c`]
 - Used is SE ResNet 50 pretrained on VGG Face2 dataset
 ```
-python finetune.py --pretrained_path 'path/to/model.pkl'
-python finetune.py --mode test --model_path 'path/to/model.pth'
+python finetune_pose.py
+python finetune_pose.py --mode test --model_path path/to/model.pth
 ```
+
 
 ### Step 4: Train Auxiliary (FC-layer) Network [`mapping: (z, c) -> z`]
 - 6 FC layers for Z space, and 15 layers for W space
@@ -78,15 +88,16 @@ python finetune.py --mode test --model_path 'path/to/model.pth'
 - Refer to Appendix B in the paper
 
 ```
-python fc_layer.py --ckpt_dir 'path/to/save_dir'
-python fc_layer.py --mode test --ckpt_dir 'path/to/save_dir' --ckpt_fname 'filename.pth'
+python fc_layer_pose.py --ckpt_dir 'path/to/save_dir'
+python fc_layer_pose.py --mode test --ckpt_dir 'path/to/save_dir' --ckpt_fname 'filename.pth'
 ```
+
 
 ### Step 5: Calculate gradient in the surrogate gradient field and update [`z`]
 - Refer to Algo 1 in the original paper
 - Manipulate C to suit your purpose
 ```
-python sgf.py --G_path 'path/to/generator.pkl' --SE_path 'path/to/se.pth' --AUX_path 'path/to/aux.pth' --save_result 1
+python sgf_pose.py --G_path 'path/to/generator.pkl' --SE_path 'path/to/se.pth' --AUX_path 'path/to/aux.pth' --save_result 1
 ```
 
 
@@ -96,12 +107,20 @@ Many thanks to the first author of the original paper, [Minjun Li](https://minju
 ## References
 - [Li, M., Jin, Y., & Zhu, H. (2021). Surrogate Gradient Field for Latent Space Manipulation. In Proceedings of the IEEE/CVF Conference on Computer Vision ](https://arxiv.org/abs/2104.09065)
 
-Also, the implementaion is based on many works:
-- [Face Alignment](https://arxiv.org/abs/1703.07332)
-    - [Official code](https://github.com/1adrianb/face-alignment)
-- [StyleGAN2](https://arxiv.org/abs/1912.04958)
-    - [Official code](https://github.com/NVlabs/stylegan2-ada-pytorch)
-- [SENet](https://arxiv.org/abs/1709.01507?spm=a2c41.13233144.0.0) & [VGG Face2 dataset](https://arxiv.org/abs/1710.08092)
-    - [Official code](https://github.com/ox-vgg/vgg_face2)
-    - [Pytorch code](https://github.com/cydonia999/VGGFace2-pytorch)
-- [AdaIN](https://arxiv.org/abs/1703.06868)
+
+## Credits
+
+**StyleGAN2-ADA:**  
+https://github.com/NVlabs/stylegan2-ada-pytorch  
+Copyright (c) 2021, NVIDIA Corporation  
+NVIDIA Source Code License https://github.com/NVlabs/stylegan2-ada-pytorch/blob/main/LICENSE.txt   
+
+**Face Alignment:**  
+https://github.com/1adrianb/face-alignment  
+Copyright (c) 2017, Adrian Bulat  
+License (BSD 3-Clause) https://github.com/1adrianb/face-alignment/blob/master/LICENSE  
+
+**VGG Face2 Datset & Squeeze and Excitation Network:**   
+https://github.com/cydonia999/VGGFace2-pytorch  
+Copyright (c) 2018 cydonia  
+License (MIT) https://github.com/cydonia999/VGGFace2-pytorch/blob/master/LICENSE  

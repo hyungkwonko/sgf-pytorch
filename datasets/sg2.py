@@ -6,7 +6,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 class StyleGAN2_Data(datasets.ImageFolder):
 
-    def __init__(self, root='data', split='train', latent_dim=512):
+    def __init__(self, root='data', split='train', lname='landmarks', latent_dim=512):
         super(StyleGAN2_Data, self).__init__(root)
 
         assert os.path.exists(root), "root: {} not found.".format(root)
@@ -20,14 +20,14 @@ class StyleGAN2_Data(datasets.ImageFolder):
 
         # self.labels = np.load(os.path.join(root, split, 'npy', 'landmarks.npy'))
         if split == 'train' or split == 'train_all':
-            self.labels_original = np.load(os.path.join(root, split, 'npy', 'landmarks.npy'))
+            self.labels_original = np.load(os.path.join(root, split, 'npy', f'{lname}.npy'))
             self.labels = self.scale_label(self.labels_original)
 
         elif split == 'val' or 'test':
-            self.labels_original = np.load(os.path.join(root, 'train_all', 'npy', 'landmarks.npy'))
+            self.labels_original = np.load(os.path.join(root, 'train_all', 'npy', f'{lname}.npy'))
             self.scale_label(self.labels_original)
 
-            self.labels_original = np.load(os.path.join(root, split, 'npy', 'landmarks.npy'))
+            self.labels_original = np.load(os.path.join(root, split, 'npy', f'{lname}.npy'))
             self.labels = self.scale_val_label(self.labels_original)
         else:
             raise ValueError(f"split was not set correctly split = ['train', 'val', 'test'] not {split}")
